@@ -259,6 +259,10 @@
     const scanQrBtn = document.getElementById('scan-qr-btn');
     const qrcodeContainer = document.getElementById('qrcode-container');
     const readerContainer = document.getElementById('reader-container');
+    const progressContainer = document.getElementById('transfer-progress-container');
+    const progressBar = document.getElementById('transfer-progress');
+    const progressPercent = document.getElementById('progress-percent');
+    const downloadArea = document.getElementById('download-area');
 
 
     // --- UTILITY FUNCTIONS ---
@@ -287,10 +291,11 @@
         
         if (hasText && !isGathering) {
             generateQrCode(sdpInput.value.trim());
+        } else {
+             document.getElementById('qrcode').innerHTML = '';
         }
     }
     
-    // --- NEW: COPY TO CLIPBOARD ---
     async function copyToClipboard() {
         try {
             await navigator.clipboard.writeText(sdpInput.value.trim());
@@ -300,12 +305,9 @@
         }
     }
     
-    // --- NEW: QR CODE GENERATION ---
     function generateQrCode(sdpData) {
-        // Clear previous QR Code
         document.getElementById('qrcode').innerHTML = '';
         
-        // Use qrcode.js to generate the QR code
         new QRCode(document.getElementById('qrcode'), {
             text: sdpData,
             width: 128,
@@ -317,10 +319,8 @@
         qrcodeContainer.style.display = 'flex';
     }
 
-    // --- NEW: QR CODE SCANNER ---
     function startQrScanner() {
         if (html5QrCode) {
-            // If scanner is running, stop it and hide the container
             html5QrCode.stop().then(() => {
                 log('QR Scanner stopped.', 'info');
                 readerContainer.style.display = 'none';
@@ -330,7 +330,6 @@
             });
             html5QrCode = null;
         } else {
-            // Initialize and start scanner
             readerContainer.style.display = 'block';
             scanQrBtn.textContent = 'Stop Scanning';
             html5QrCode = new Html5Qrcode("reader");
@@ -338,18 +337,17 @@
             const config = { fps: 10, qrbox: { width: 250, height: 250 } };
             
             html5QrCode.start(
-                { facingMode: "environment" }, // Prefer rear camera on mobile
+                { facingMode: "environment" },
                 config,
                 (decodedText) => {
-                    // Success callback: A QR code was scanned
-                    log('QR Code scanned successfully!', 'success');
+                    log('QR Code scanned successfully! Applying code...', 'success');
                     sdpInput.value = decodedText;
                     updateSignalingUI();
                     setSdp(); // Automatically apply the code
                     startQrScanner(); // Stop the scanner
                 },
                 (errorMessage) => {
-                    // Failure callback: No QR code found yet
+                    // console.log(errorMessage); // silent failure
                 }
             ).catch((err) => {
                 log(`QR Scanner failed to start: ${err}`, 'error');
@@ -374,22 +372,26 @@
         isGathering = true;
         
         peerConnection.onicecandidate = ({ candidate }) => {
+             // Check for the final null candidate signaling end of gathering
             if (!candidate && isGathering) { 
                 isGathering = false; 
                 
-                const sdp = peerConnection.localDescription.sdp;
-                sdpInput.value = sdp;
-                
-                log('Full SDP Code generated in the text area.', 'success');
-                updateSignalingUI(); // Update UI to show QR/Copy button
-                
-                if (peerConnection.localDescription.type === 'offer') {
-                     updateStatus('Offer READY! Copy or Scan Code below.', 'success');
-                     log('ACTION: Copy this Offer Code or use the QR code!', 'success');
-                } else if (peerConnection.localDescription.type === 'answer') {
-                     updateStatus('Answer READY! Copy or Scan Code below.', 'success');
-                     log('ACTION: Copy this Answer Code or use the QR code!', 'success');
-                }
+                // *** THE CRITICAL FIX: Add a small delay to ensure the SDP buffer is complete ***
+                setTimeout(() => {
+                    const sdp = peerConnection.localDescription.sdp;
+                    sdpInput.value = sdp;
+                    
+                    log('Full SDP Code generated in the text area.', 'success');
+                    updateSignalingUI(); // Update UI to show QR/Copy button
+                    
+                    if (peerConnection.localDescription.type === 'offer') {
+                         updateStatus('Offer READY! Copy or Scan Code below.', 'success');
+                         log('ACTION: Copy this Offer Code or use the QR code!', 'success');
+                    } else if (peerConnection.localDescription.type === 'answer') {
+                         updateStatus('Answer READY! Copy or Scan Code below.', 'success');
+                         log('ACTION: Copy this Answer Code or use the QR code!', 'success');
+                    }
+                }, 100); // 100ms is usually sufficient for the browser to finalize the SDP string
             }
         };
 
@@ -424,7 +426,6 @@
             if (fileToSend) {
                 sendFile();
             } else {
-                // Receiver role
                 document.getElementById('transfer-progress-container').style.display = 'block';
                 log('Ready to receive file chunks...', 'info');
             }
@@ -450,8 +451,9 @@
         dataChannel = channel;
     }
 
-    // --- SENDER/RECEIVER LOGIC (Omitted for brevity, remains the same) ---
-    // (createOffer, prepareFile, sendFile, createAnswer, handleMetadata, handleFileChunk functions are unchanged)
+
+    // --- SENDER LOGIC ---
+
     async function createOffer() {
         initializePeerConnection();
         dataChannel = peerConnection.createDataChannel('file-transfer', { ordered: true });
@@ -467,9 +469,11 @@
     }
     
     function prepareFile(file) {
-        // ... (File prep logic is the same) ...
         if (file.size > MAX_FILE_SIZE) {
-            // ... (error handling) ...
+            log(`File size exceeds the ${MAX_FILE_SIZE / (1024*1024)}MB limit.`, 'error');
+            fileToSend = null;
+            document.getElementById('file-info').textContent = '';
+            createOfferBtn.disabled = true;
             return;
         }
         fileToSend = file;
@@ -487,13 +491,55 @@
     }
 
     function sendFile() {
-        // ... (Send file logic is the same) ...
         if (!dataChannel || dataChannel.readyState !== 'open' || !fileToSend) {
             log('Data channel not ready or no file selected.', 'error');
             return;
         }
-        // ... (sending logic omitted) ...
+
+        progressContainer.style.display = 'block';
+        
+        const metadata = JSON.stringify({
+            name: fileToSend.name,
+            size: totalFileSize,
+            type: fileToSend.type
+        });
+        dataChannel.send(metadata);
+        log(`Sent file metadata: ${fileToSend.name}`, 'info');
+
+        let chunkIndex = 0;
+        let bytesSent = 0;
+
+        function sendNextChunk() {
+            if (chunkIndex < fileChunks.length) {
+                const chunk = fileChunks[chunkIndex];
+                
+                if (dataChannel.bufferedAmount > 65536) { 
+                    setTimeout(sendNextChunk, 100);
+                    return;
+                }
+
+                dataChannel.send(chunk);
+                bytesSent += chunk.size;
+                
+                const percent = ((bytesSent / totalFileSize) * 100);
+                progressBar.value = percent;
+                progressPercent.textContent = `${percent.toFixed(1)}%`;
+                updateStatus(`Sending: ${percent.toFixed(1)}%`, 'progress');
+
+                chunkIndex++;
+                requestAnimationFrame(sendNextChunk);
+            } else {
+                log('File transfer complete!', 'success');
+                updateStatus('Transfer Complete!', 'success');
+                fileToSend = null;
+            }
+        }
+        
+        sendNextChunk();
     }
+
+
+    // --- RECEIVER LOGIC ---
 
     async function createAnswer() {
         if (!peerConnection || !peerConnection.remoteDescription) {
@@ -511,24 +557,51 @@
     }
 
     function handleMetadata(data) {
-        // ... (Handle metadata logic is the same) ...
         try {
             const metadata = JSON.parse(data);
             totalFileSize = metadata.size;
             receivedChunks = [];
             bytesReceived = 0;
+            
             log(`Receiving file: ${metadata.name} (${(metadata.size / 1024 / 1024).toFixed(2)} MB)`, 'success');
-            // ... (UI updates omitted) ...
-        } catch (e) { /* Ignore non-metadata strings */ }
+            updateStatus('Receiving Data...', 'progress');
+            
+            progressContainer.style.display = 'block';
+            progressBar.value = 0;
+            progressPercent.textContent = '0%';
+            
+            document.getElementById('progress-percent').dataset.filename = metadata.name;
+        } catch (e) {
+             // Silent failure for non-metadata messages
+        }
     }
     
     function handleFileChunk(chunk) {
-        // ... (Handle chunk logic is the same) ...
         receivedChunks.push(chunk);
         bytesReceived += chunk.byteLength;
-        // ... (progress update omitted) ...
+
+        const percent = ((bytesReceived / totalFileSize) * 100);
+        progressBar.value = percent; 
+        progressPercent.textContent = `${percent.toFixed(1)}%`;
+        
         if (bytesReceived >= totalFileSize) {
-            // ... (download link generation omitted) ...
+            log('All chunks received! Rebuilding file...', 'info');
+            
+            const fileBlob = new Blob(receivedChunks, { type: dataChannel.binaryType });
+            const fileName = progressPercent.dataset.filename || 'downloaded_file';
+            
+            const url = URL.createObjectURL(fileBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            a.textContent = `Download: ${fileName}`;
+            a.style.cssText = 'color: var(--primary-color); text-decoration: none; font-weight: bold; font-size: 1.1em;';
+            
+            downloadArea.innerHTML = '';
+            downloadArea.appendChild(a);
+            
+            log('File successfully received and ready for download!', 'success');
+            updateStatus('Transfer Complete! Download Ready.', 'success');
         }
     }
     // --- END SENDER/RECEIVER LOGIC ---
@@ -538,7 +611,8 @@
         const sdpText = sdpInput.value.trim();
         if (!sdpText) return;
         
-        const type = sdpText.includes('a=setup:passive') || peerConnection?.localDescription?.type === 'offer' ? 'answer' : 'offer';
+        // Naive determination: if we have a local offer, the incoming SDP must be an answer. Otherwise, assume offer.
+        const type = peerConnection?.localDescription?.type === 'offer' ? 'answer' : 'offer';
 
         if (!peerConnection) {
             initializePeerConnection();
@@ -547,6 +621,7 @@
         const remoteDesc = new RTCSessionDescription({ type: type, sdp: sdpText });
         
         try {
+            // This line is now protected by the 100ms delay on the generating side.
             await peerConnection.setRemoteDescription(remoteDesc); 
             log(`Remote ${type} applied successfully.`, 'success');
             sdpInput.value = '';
@@ -584,12 +659,31 @@
     copyBtn.addEventListener('click', copyToClipboard);
     scanQrBtn.addEventListener('click', startQrScanner);
     
+    // Drag and drop listeners (for visual feedback)
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        }, false);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, () => dropArea.classList.add('highlight'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, () => dropArea.classList.remove('highlight'), false);
+    });
+
+    dropArea.addEventListener('drop', (e) => {
+        if (e.dataTransfer.files.length) {
+            prepareFile(e.dataTransfer.files[0]);
+        }
+    }, false);
+    
     // Initial State
     updateSignalingUI(); 
     log('System Ready. Await user action.', 'info');
-
-    // ... (Drag and drop listeners omitted for brevity, they remain unchanged) ...
-
 </script>
 
 </body>
