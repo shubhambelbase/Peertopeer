@@ -95,7 +95,7 @@
             transition: background-color 0.2s, box-shadow 0.2s;
         }
 
-        button:hover {
+        button:hover:not(:disabled) {
             background-color: #33ffdb;
             box-shadow: 0 0 10px var(--primary-color);
         }
@@ -104,6 +104,7 @@
             background-color: #555;
             cursor: not-allowed;
             box-shadow: none;
+            color: #ccc;
         }
 
         textarea {
@@ -170,7 +171,7 @@
     <textarea id="sdp-input" placeholder="Paste Code Here to Receive or enter code to share..." rows="4"></textarea>
 
     <div class="flex-row">
-        <button id="set-sdp-btn">Apply Code</button>
+        <button id="set-sdp-btn" disabled>Apply Code</button>
     </div>
 
     <div class="section-header">3. Transfer Log</div>
@@ -205,6 +206,7 @@
     let receivedChunks = [];
     let totalFileSize = 0;
     let bytesReceived = 0;
+    let isGathering = false; // Flag to track ICE gathering
 
     // --- DOM ELEMENTS ---
     const dropArea = document.getElementById('drop-area');
@@ -229,12 +231,21 @@
         p.className = `log-${type}`;
         p.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
         statusLog.prepend(p); // Add to the top
+        // Limit log size to prevent UI slowdown
+        if (statusLog.children.length > 50) {
+            statusLog.removeChild(statusLog.lastChild);
+        }
     }
     
     /** Updates the visual connection status. */
     function updateStatus(status, type = 'info') {
         connectionStatus.textContent = status;
         connectionStatus.className = `log-${type}`;
+    }
+    
+    /** Check if text is in the SDP box and enable/disable Apply button. */
+    function updateApplyButtonState() {
+        setSdpBtn.disabled = sdpInput.value.trim().length === 0;
     }
 
     // --- WEB RTC CORE LOGIC ---
@@ -244,26 +255,34 @@
         if (peerConnection) {
             log('PeerConnection already active. Resetting...', 'info');
             peerConnection.close();
+            peerConnection = null;
         }
 
         peerConnection = new RTCPeerConnection({ iceServers: ICE_SERVERS });
         log('RTCPeerConnection initialized with STUN server.', 'info');
         updateStatus('Initialized. Waiting for signaling...');
-
+        isGathering = true;
+        
         // 1. ICE Candidate Exchange
+        // The peerConnection.onicecandidate event fires constantly. We listen for the 'gathering complete' state.
         peerConnection.onicecandidate = ({ candidate }) => {
-            if (candidate) return; // Wait for the final null candidate
-            
-            // This event fires when all ICE candidates have been gathered.
-            // The full description (SDP) is now available.
-            const sdp = peerConnection.localDescription.sdp;
-            sdpInput.value = sdp;
-            log('Full SDP Code generated in the text area.', 'success');
-            
-            if (peerConnection.localDescription.type === 'offer') {
-                 log('ACTION: Copy this Offer Code and paste it into the other browser!', 'success');
-            } else if (peerConnection.localDescription.type === 'answer') {
-                 log('ACTION: Copy this Answer Code and paste it back to the Sender browser!', 'success');
+             // If we get a null candidate, gathering is finished.
+            if (!candidate && isGathering) { 
+                isGathering = false; // Stop tracking gathering
+                
+                // --- FIX: Ensure the final SDP is copied ---
+                const sdp = peerConnection.localDescription.sdp;
+                sdpInput.value = sdp; // Populate text area with the COMPLETE SDP
+                
+                log('Full SDP Code generated in the text area.', 'success');
+                
+                if (peerConnection.localDescription.type === 'offer') {
+                     updateStatus('Offer READY! Copy Code below.', 'success');
+                     log('ACTION: Copy this Offer Code and paste it into the other browser!', 'success');
+                } else if (peerConnection.localDescription.type === 'answer') {
+                     updateStatus('Answer READY! Copy Code below.', 'success');
+                     log('ACTION: Copy this Answer Code and paste it back to the Sender browser!', 'success');
+                }
             }
         };
 
@@ -277,6 +296,9 @@
                 case 'failed':
                 case 'closed':
                     updateStatus('Connection Failed or Closed.', 'error');
+                    break;
+                case 'connecting':
+                    updateStatus('Attempting connection...', 'progress');
                     break;
             }
         };
@@ -308,7 +330,6 @@
         };
 
         channel.onmessage = (event) => {
-            // Data is received as an ArrayBuffer
             if (typeof event.data === 'string') {
                 handleMetadata(event.data);
             } else if (event.data instanceof ArrayBuffer) {
@@ -336,24 +357,24 @@
         initializePeerConnection();
         
         // Create the data channel (initiator of the connection)
-        dataChannel = peerConnection.createDataChannel('file-transfer');
+        dataChannel = peerConnection.createDataChannel('file-transfer', { ordered: true });
         setupDataChannelListeners(dataChannel);
 
         try {
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
             
-            // The onicecandidate event will now populate sdpInput with the SDP.
             updateStatus('Offer created. Gathering ICE Candidates...', 'progress');
+            createOfferBtn.disabled = true; // Disable until complete
         } catch (error) {
             log(`Error creating offer: ${error.message}`, 'error');
         }
     }
 
-    /** Splits the selected file into chunks and sends the metadata. */
+    /** Prepares file for transfer. */
     function prepareFile(file) {
         if (file.size > MAX_FILE_SIZE) {
-            log(`File size (${(file.size / (1024*1024)).toFixed(2)}MB) exceeds the ${MAX_FILE_SIZE / (1024*1024)}MB limit.`, 'error');
+            log(`File size exceeds the ${MAX_FILE_SIZE / (1024*1024)}MB limit.`, 'error');
             fileToSend = null;
             fileInfo.textContent = '';
             createOfferBtn.disabled = true;
@@ -364,7 +385,6 @@
         totalFileSize = file.size;
         fileChunks = [];
         
-        // Use a FileReader to chunk the file
         let offset = 0;
         while (offset < totalFileSize) {
             const chunk = file.slice(offset, offset + CHUNK_SIZE);
@@ -379,6 +399,7 @@
 
     /** Sends file metadata and then the chunks through the Data Channel. */
     function sendFile() {
+        // ... (sendFile logic remains the same, focused on chunking) ...
         if (!dataChannel || dataChannel.readyState !== 'open' || !fileToSend) {
             log('Data channel not ready or no file selected.', 'error');
             return;
@@ -390,7 +411,6 @@
         const metadata = JSON.stringify({
             name: fileToSend.name,
             size: totalFileSize,
-            chunks: fileChunks.length,
             type: fileToSend.type
         });
         dataChannel.send(metadata);
@@ -400,13 +420,12 @@
         let chunkIndex = 0;
         let bytesSent = 0;
 
-        // Function to send chunks recursively to avoid buffer overflow
         function sendNextChunk() {
             if (chunkIndex < fileChunks.length) {
                 const chunk = fileChunks[chunkIndex];
                 
-                // Wait for the channel's buffer to clear if needed
-                if (dataChannel.bufferedAmount > 65536) { // Buffer threshold
+                // Flow control to prevent buffer overflow
+                if (dataChannel.bufferedAmount > 65536) { 
                     setTimeout(sendNextChunk, 100);
                     return;
                 }
@@ -414,7 +433,6 @@
                 dataChannel.send(chunk);
                 bytesSent += chunk.size;
                 
-                // Update progress
                 const percent = ((bytesSent / totalFileSize) * 100).toFixed(1);
                 progressBar.value = percent;
                 progressPercent.textContent = `${percent}%`;
@@ -425,11 +443,12 @@
             } else {
                 log('File transfer complete!', 'success');
                 updateStatus('Transfer Complete!', 'success');
-                fileToSend = null; // Clear state
+                fileToSend = null;
+                // Optional: Close channel after transfer
+                // dataChannel.close(); 
             }
         }
         
-        // Start sending
         sendNextChunk();
     }
 
@@ -438,7 +457,7 @@
 
     /** Creates the SDP Answer to a received Offer. */
     async function createAnswer() {
-        if (!peerConnection.remoteDescription) {
+        if (!peerConnection || !peerConnection.remoteDescription) {
             log('Cannot create Answer: No Offer code has been applied yet.', 'error');
             return;
         }
@@ -446,14 +465,15 @@
         try {
             const answer = await peerConnection.createAnswer();
             await peerConnection.setLocalDescription(answer);
-            // The onicecandidate event will now populate sdpInput with the Answer SDP.
+            
             updateStatus('Answer created. Gathering ICE Candidates...', 'progress');
+            createAnswerBtn.disabled = true; // Disable until complete
         } catch (error) {
             log(`Error creating answer: ${error.message}`, 'error');
         }
     }
 
-    /** Handles incoming file metadata (the first message). */
+    /** Handles incoming file metadata. */
     function handleMetadata(data) {
         try {
             const metadata = JSON.parse(data);
@@ -463,14 +483,15 @@
             
             log(`Receiving file: ${metadata.name} (${(metadata.size / 1024 / 1024).toFixed(2)} MB)`, 'success');
             updateStatus('Receiving Data...', 'progress');
+            
+            // Note: progressBar.max must be set to 100 for percentage visualization in this CSS structure
             progressContainer.style.display = 'block';
             progressBar.value = 0;
-            progressBar.max = totalFileSize;
-
-            // Set the filename on the progress bar for display purposes
+            progressPercent.textContent = '0%';
+            
             document.getElementById('progress-percent').dataset.filename = metadata.name;
         } catch (e) {
-            // Ignore non-JSON strings for this simple demo
+            log('Warning: Received non-metadata string message.', 'info');
         }
     }
 
@@ -479,10 +500,10 @@
         receivedChunks.push(chunk);
         bytesReceived += chunk.byteLength;
 
-        // Update progress
-        const percent = ((bytesReceived / totalFileSize) * 100).toFixed(1);
-        progressBar.value = bytesReceived;
-        progressPercent.textContent = `${percent}%`;
+        // Update progress (Max is 100 for percentage bar)
+        const percent = ((bytesReceived / totalFileSize) * 100);
+        progressBar.value = percent; 
+        progressPercent.textContent = `${percent.toFixed(1)}%`;
         
         if (bytesReceived >= totalFileSize) {
             log('All chunks received! Rebuilding file...', 'info');
@@ -499,7 +520,6 @@
             a.textContent = `Download: ${fileName}`;
             a.style.cssText = 'color: var(--primary-color); text-decoration: none; font-weight: bold; font-size: 1.1em;';
             
-            // Clear and show the download link
             downloadArea.innerHTML = '';
             downloadArea.appendChild(a);
             
@@ -514,32 +534,41 @@
     /** Sets the SDP (Offer or Answer) received from the other peer. */
     async function setSdp() {
         const sdpText = sdpInput.value.trim();
-        if (!sdpText) {
-            log('Paste a Code into the text area first!', 'error');
-            return;
-        }
+        if (!sdpText) return; // Should be disabled, but good guard
         
-        // A naive check to guess if it's an Offer (which should be pasted first)
-        const isOffer = sdpText.includes('a=sendrecv'); 
+        // This check is crucial for our fixed logic
+        const isOffer = sdpText.includes('a=fingerprint'); 
 
         // 1. Initialize Peer Connection if not already done (for the Receiver)
         if (!peerConnection) {
             initializePeerConnection();
         }
-
-        // 2. Create the Remote Description object
+        
+        // 2. Determine the type based on the content
+        let type;
+        if (sdpText.includes('a=setup:passive') || peerConnection.localDescription?.type === 'offer') {
+             // If we have a local offer, the incoming SDP must be an answer.
+             type = 'answer'; 
+        } else {
+             // Otherwise, assume the first pasted code is the Offer
+             type = 'offer';
+        }
+        
+        // 3. Create the Remote Description object
         const remoteDesc = new RTCSessionDescription({
-            type: isOffer ? 'offer' : 'answer',
+            type: type,
             sdp: sdpText
         });
         
-        // 3. Set the Remote Description
+        // 4. Set the Remote Description
         try {
-            await peerConnection.setRemoteDescription(remoteDesc);
-            log(`Remote ${isOffer ? 'Offer' : 'Answer'} applied successfully.`, 'success');
+            // This is the line that previously failed due to incomplete SDP
+            await peerConnection.setRemoteDescription(remoteDesc); 
+            log(`Remote ${type} applied successfully.`, 'success');
             sdpInput.value = '';
+            updateApplyButtonState(); // Disable button after clearing text
             
-            if (isOffer) {
+            if (type === 'offer') {
                 // If we received an Offer, we must now generate and send back an Answer.
                 createAnswerBtn.disabled = false;
                 log('ACTION: Offer received. Click "Generate Answer" and send that code back to the Sender.', 'info');
@@ -549,7 +578,10 @@
                 createAnswerBtn.disabled = true;
             }
         } catch (error) {
-            log(`Error setting Remote Description: ${error.message}`, 'error');
+            // Provide better context for the user if it fails
+            log(`FATAL ERROR: Failed to apply code. Reason: ${error.name}. Ensure you copied the FULL, FINAL code.`, 'error');
+            log(`Detailed Error: ${error.message}`, 'error');
+            updateStatus('Signaling Failed. Check log.', 'error');
         }
     }
 
@@ -558,6 +590,9 @@
     // File Drop & Select Handlers
     dropArea.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', (e) => prepareFile(e.target.files[0]));
+    
+    // Listen for text input to enable the Apply Code button (THE FIX)
+    sdpInput.addEventListener('input', updateApplyButtonState);
 
     // Drag-and-Drop Visual Feedback
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -587,6 +622,7 @@
     setSdpBtn.addEventListener('click', setSdp);
     
     // Initial State Check
+    updateApplyButtonState(); 
     log('System Ready. Await user action.', 'info');
 </script>
 
