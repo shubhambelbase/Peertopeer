@@ -1,690 +1,150 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sci-Fi P2P File Sharer | WebRTC</title>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode.js/1.0.0/qrcode.min.js"></script>
-    <script src="https://unpkg.com/html5-qrcode"></script>
-
-    <style>
-        /* --- SCI-FI THEME CSS --- */
-        :root {
-            --bg-color: #12121e;
-            --primary-color: #00ffc4; /* Neon Teal */
-            --secondary-color: #007acc; /* Deep Blue Accent */
-            --text-color: #e0e0e0;
-            --font-mono: 'Space Mono', 'Courier New', monospace;
-        }
-
-        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
-
-        body {
-            font-family: var(--font-mono);
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 900px;
-            background: #1a1a2e; /* Darker panel background */
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 0 30px rgba(0, 255, 196, 0.2); /* Neon glow */
-            border: 1px solid var(--secondary-color);
-        }
-
-        h1 {
-            color: var(--primary-color);
-            text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            border-bottom: 2px solid var(--primary-color);
-            padding-bottom: 10px;
-            margin-bottom: 30px;
-            text-shadow: 0 0 5px rgba(0, 255, 196, 0.7);
-        }
-
-        .section-header {
-            color: var(--secondary-color);
-            font-size: 1.2em;
-            margin-top: 20px;
-            margin-bottom: 10px;
-            border-left: 4px solid var(--primary-color);
-            padding-left: 10px;
-        }
-
-        /* --- DRAG & DROP AREA --- */
-        #drop-area {
-            border: 3px dashed var(--primary-color);
-            border-radius: 8px;
-            padding: 40px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-bottom: 20px;
-            background-color: #242442;
-        }
-
-        #drop-area.highlight {
-            background-color: #1a3a3e;
-            border-color: #fff;
-            box-shadow: 0 0 15px var(--primary-color);
-        }
-
-        #drop-area p {
-            margin: 0;
-            color: var(--text-color);
-        }
-
-        /* --- BUTTONS & INPUTS --- */
-        button {
-            background-color: var(--primary-color);
-            color: var(--bg-color);
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            text-transform: uppercase;
-            margin-right: 10px;
-            transition: background-color 0.2s, box-shadow 0.2s;
-        }
-
-        button:hover:not(:disabled) {
-            background-color: #33ffdb;
-            box-shadow: 0 0 10px var(--primary-color);
-        }
-        
-        button:disabled {
-            background-color: #555;
-            cursor: not-allowed;
-            box-shadow: none;
-            color: #ccc;
-        }
-
-        textarea {
-            width: 98%;
-            min-height: 100px;
-            background-color: #0b0b1a;
-            color: var(--primary-color);
-            border: 1px solid var(--secondary-color);
-            padding: 10px;
-            margin-top: 10px;
-            resize: none;
-            font-family: var(--font-mono);
-            border-radius: 4px;
-        }
-
-        /* --- STATUS & LOG --- */
-        #status-log {
-            min-height: 100px;
-            background-color: #0b0b1a;
-            border: 1px solid var(--secondary-color);
-            padding: 10px;
-            margin-top: 20px;
-            overflow-y: auto;
-            border-radius: 4px;
-            font-size: 0.9em;
-        }
-        .log-info { color: var(--text-color); }
-        .log-success { color: var(--primary-color); }
-        .log-error { color: #ff6347; }
-        .log-progress { color: #ffff00; }
-
-        .flex-row {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-            align-items: center;
-        }
-        
-        /* QR specific styles */
-        #qrcode-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 20px 0;
-            padding: 10px;
-            background: var(--bg-color);
-            border-radius: 8px;
-        }
-        
-        /* Scanner styles */
-        #reader {
-            width: 100%;
-            max-width: 400px;
-            border: 2px dashed var(--secondary-color);
-            margin: 20px auto;
-            border-radius: 8px;
-        }
-
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon P2P File Sharer</title>
+<style>
+body {
+  margin: 0;
+  font-family: 'Courier New', monospace;
+  background-color: #0a0a0a;
+  color: #00ffea;
+}
+h1 { text-align: center; color: #00ffea; }
+.container { display: flex; flex-direction: column; align-items: center; padding: 20px; gap: 15px; }
+button, input, textarea { font-family: monospace; background-color: #111; color: #00ffea; border: 1px solid #00ffea; padding: 8px; }
+textarea { width: 90%; height: 80px; resize: none; }
+.progress-bar { width: 90%; background: #111; border: 1px solid #00ffea; height: 20px; margin: 5px 0; position: relative; }
+.progress-fill { background: #00ffea; height: 100%; width: 0%; }
+#qrCanvas { margin-top: 10px; }
+</style>
 </head>
 <body>
-
+<h1>🌌 Neon P2P File Sharer</h1>
 <div class="container">
-    <h1><span style="color:var(--secondary-color);">::</span> WebRTC Data Conduit <span style="color:var(--secondary-color);">::</span></h1>
-    <p>Status: <span id="connection-status" class="log-info">Awaiting connection...</span></p>
-    
-    <div class="section-header">1. File Drop (Sender)</div>
-    
-    <input type="file" id="file-input" style="display:none;">
-    <div id="drop-area">
-        <p>DROP FILE HERE to become the **SENDER** and generate a Code.</p>
-        <p><small>(Click or drag a file up to 50MB)</small></p>
-    </div>
-    <div id="file-info" style="margin-bottom: 15px; color: var(--primary-color);"></div>
-
-    <div class="section-header">2. Signaling Exchange</div>
-    <p><small>Use the QR Code or Clipboard for easy exchange.</small></p>
-
-    <div class="flex-row">
-        <button id="create-offer-btn" disabled>Create Offer Code (Sender)</button>
-        <button id="create-answer-btn" disabled>Generate Answer (Receiver)</button>
-    </div>
-
-    <textarea id="sdp-input" placeholder="Paste Code Here to Receive, or view the code to share..." rows="4"></textarea>
-
-    <div class="flex-row" style="justify-content: space-between;">
-        <button id="copy-btn" disabled>Copy Code to Clipboard</button>
-        <div>
-            <button id="set-sdp-btn" disabled>Apply Code</button>
-            <button id="scan-qr-btn">Scan QR Code</button>
-        </div>
-    </div>
-    
-    <div id="qrcode-container" style="display: none;">
-        <div id="qrcode" style="width:128px; height:128px; background-color: #fff; padding: 5px;"></div>
-    </div>
-    
-    <div id="reader-container" style="display: none;">
-        <p style="text-align: center; color: var(--primary-color);">Scan QR Code from other device:</p>
-        <div id="reader"></div>
-    </div>
-
-
-    <div class="section-header">3. Transfer Log</div>
-    <div id="status-log">
-        <p class="log-info">System Online. Initialize by dropping a file or pasting a code.</p>
-    </div>
-    
-    <div id="transfer-progress-container" style="margin-top: 20px; display: none;">
-        <div style="color: var(--primary-color);">Transfer Progress: <span id="progress-percent">0%</span></div>
-        <progress id="transfer-progress" value="0" max="100" style="width: 100%; height: 20px; accent-color: var(--primary-color);"></progress>
-    </div>
-    
-    <div id="download-area" style="margin-top: 20px; text-align: center;"></div>
-
+  <input type="file" id="fileInput" />
+  <button id="sendBtn">Send File</button>
+  <div class="progress-bar"><div class="progress-fill" id="sendProgress"></div></div>
+  
+  <textarea id="offerText" placeholder="Offer/Answer code here"></textarea>
+  <button id="createOffer">Create Offer</button>
+  <button id="createAnswer">Create Answer</button>
+  <button id="applyCode">Apply Code</button>
+  <button id="copyCode">Copy to Clipboard</button>
+  
+  <canvas id="qrCanvas"></canvas>
+  <video id="qrVideo" style="display:none;" autoplay></video>
+  
+  <a id="downloadLink" style="display:none; color:#0ff;">Download Received File</a>
+  <div class="progress-bar"><div class="progress-fill" id="recvProgress"></div></div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 <script>
-    // --- JAVASCRIPT LOGIC ---
-    
-    // --- CONFIGURATION ---
-    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB limit for simple demo
-    const CHUNK_SIZE = 16384; // 16KB per chunk (optimal for DataChannel)
-    const ICE_SERVERS = [
-        { urls: 'stun:stun.l.google.com:19302' }, // Free STUN server
-    ];
+let pc = new RTCPeerConnection();
+let dataChannel;
+let fileBuffer = [];
+let fileSize = 0;
+let chunkSize = 16*1024;
 
-    // --- STATE VARIABLES & DOM ELEMENTS ---
-    let peerConnection;
-    let dataChannel;
-    let fileToSend = null;
-    let fileChunks = [];
-    let receivedChunks = [];
-    let totalFileSize = 0;
-    let bytesReceived = 0;
-    let isGathering = false; // Flag to track ICE gathering
-    let html5QrCode = null; // Variable for the scanner instance
+const sendProgress = document.getElementById('sendProgress');
+const recvProgress = document.getElementById('recvProgress');
+const fileInput = document.getElementById('fileInput');
+const downloadLink = document.getElementById('downloadLink');
+const offerText = document.getElementById('offerText');
+const qrCanvas = document.getElementById('qrCanvas');
 
-    const dropArea = document.getElementById('drop-area');
-    const fileInput = document.getElementById('file-input');
-    const createOfferBtn = document.getElementById('create-offer-btn');
-    const createAnswerBtn = document.getElementById('create-answer-btn');
-    const setSdpBtn = document.getElementById('set-sdp-btn');
-    const sdpInput = document.getElementById('sdp-input');
-    const statusLog = document.getElementById('status-log');
-    const connectionStatus = document.getElementById('connection-status');
-    const copyBtn = document.getElementById('copy-btn');
-    const scanQrBtn = document.getElementById('scan-qr-btn');
-    const qrcodeContainer = document.getElementById('qrcode-container');
-    const readerContainer = document.getElementById('reader-container');
-    const progressContainer = document.getElementById('transfer-progress-container');
-    const progressBar = document.getElementById('transfer-progress');
-    const progressPercent = document.getElementById('progress-percent');
-    const downloadArea = document.getElementById('download-area');
+// Data Channel setup
+function setupDataChannel(channel) {
+  dataChannel = channel;
+  dataChannel.binaryType = 'arraybuffer';
 
-
-    // --- UTILITY FUNCTIONS ---
-
-    function log(message, type = 'info') {
-        const p = document.createElement('p');
-        p.className = `log-${type}`;
-        p.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-        statusLog.prepend(p);
-        if (statusLog.children.length > 50) {
-            statusLog.removeChild(statusLog.lastChild);
-        }
+  dataChannel.onopen = () => console.log("DataChannel open");
+  dataChannel.onmessage = async (event) => {
+    fileBuffer.push(event.data);
+    fileSize += event.data.byteLength;
+    recvProgress.style.width = Math.min(fileSize / totalSize * 100, 100) + '%';
+    if(fileSize >= totalSize) {
+      const blob = new Blob(fileBuffer);
+      const url = URL.createObjectURL(blob);
+      downloadLink.href = url;
+      downloadLink.download = fileName;
+      downloadLink.style.display = 'block';
     }
-    
-    function updateStatus(status, type = 'info') {
-        connectionStatus.textContent = status;
-        connectionStatus.className = `log-${type}`;
-    }
-    
-    /** Check if text is in the SDP box and update button states. */
-    function updateSignalingUI() {
-        const hasText = sdpInput.value.trim().length > 0;
-        setSdpBtn.disabled = !hasText;
-        copyBtn.disabled = !hasText;
-        qrcodeContainer.style.display = hasText && !isGathering ? 'flex' : 'none';
-        
-        if (hasText && !isGathering) {
-            generateQrCode(sdpInput.value.trim());
-        } else {
-             document.getElementById('qrcode').innerHTML = '';
-        }
-    }
-    
-    async function copyToClipboard() {
-        try {
-            await navigator.clipboard.writeText(sdpInput.value.trim());
-            log('SDP Code copied to clipboard!', 'info');
-        } catch (err) {
-            log('Could not copy text to clipboard. Please copy manually.', 'error');
-        }
-    }
-    
-    function generateQrCode(sdpData) {
-        document.getElementById('qrcode').innerHTML = '';
-        
-        new QRCode(document.getElementById('qrcode'), {
-            text: sdpData,
-            width: 128,
-            height: 128,
-            colorDark : "#000000",
-            colorLight : "#ffffff",
-            correctLevel : QRCode.CorrectLevel.L
-        });
-        qrcodeContainer.style.display = 'flex';
-    }
+  };
+}
 
-    function startQrScanner() {
-        if (html5QrCode) {
-            html5QrCode.stop().then(() => {
-                log('QR Scanner stopped.', 'info');
-                readerContainer.style.display = 'none';
-                scanQrBtn.textContent = 'Scan QR Code';
-            }).catch(err => {
-                log('Error stopping scanner.', 'error');
-            });
-            html5QrCode = null;
-        } else {
-            readerContainer.style.display = 'block';
-            scanQrBtn.textContent = 'Stop Scanning';
-            html5QrCode = new Html5Qrcode("reader");
+// Send File in chunks
+let totalSize = 0;
+let fileName = '';
+document.getElementById('sendBtn').onclick = async () => {
+  if(!fileInput.files[0]) return alert("Select file first");
+  const file = fileInput.files[0];
+  fileName = file.name;
+  totalSize = file.size;
+  for(let offset=0; offset<file.size; offset+=chunkSize){
+    const chunk = file.slice(offset, offset+chunkSize);
+    dataChannel.send(await chunk.arrayBuffer());
+    sendProgress.style.width = Math.min(offset/file.size*100,100)+'%';
+  }
+  sendProgress.style.width = '100%';
+};
 
-            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-            
-            html5QrCode.start(
-                { facingMode: "environment" },
-                config,
-                (decodedText) => {
-                    log('QR Code scanned successfully! Applying code...', 'success');
-                    sdpInput.value = decodedText;
-                    updateSignalingUI();
-                    setSdp(); // Automatically apply the code
-                    startQrScanner(); // Stop the scanner
-                },
-                (errorMessage) => {
-                    // console.log(errorMessage); // silent failure
-                }
-            ).catch((err) => {
-                log(`QR Scanner failed to start: ${err}`, 'error');
-                readerContainer.style.display = 'none';
-                scanQrBtn.textContent = 'Scan QR Code';
-            });
-        }
-    }
+// Manual Signaling
+async function createOffer(){
+  dataChannel = pc.createDataChannel("fileChannel");
+  setupDataChannel(dataChannel);
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await waitICE();
+  offerText.value = btoa(pc.localDescription.sdp);
+  QRCode.toCanvas(qrCanvas, offerText.value);
+}
 
+async function createAnswer(){
+  pc.ondatachannel = (e) => setupDataChannel(e.channel);
+  const offerSdp = atob(offerText.value);
+  await pc.setRemoteDescription({type:"offer", sdp:offerSdp});
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  await waitICE();
+  offerText.value = btoa(pc.localDescription.sdp);
+  QRCode.toCanvas(qrCanvas, offerText.value);
+}
 
-    // --- WEB RTC CORE LOGIC ---
+async function applyCode(){
+  const code = offerText.value;
+  const sdp = atob(code);
+  await pc.setRemoteDescription({type:"answer", sdp});
+}
 
-    function initializePeerConnection() {
-        if (peerConnection) {
-            peerConnection.close();
-            peerConnection = null;
-        }
+// Clipboard copy
+document.getElementById('copyCode').onclick = () => navigator.clipboard.writeText(offerText.value);
 
-        peerConnection = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-        log('RTCPeerConnection initialized with STUN server.', 'info');
-        updateStatus('Initialized. Waiting for signaling...');
-        isGathering = true;
-        
-        peerConnection.onicecandidate = ({ candidate }) => {
-             // Check for the final null candidate signaling end of gathering
-            if (!candidate && isGathering) { 
-                isGathering = false; 
-                
-                // *** THE CRITICAL FIX: Add a small delay to ensure the SDP buffer is complete ***
-                setTimeout(() => {
-                    const sdp = peerConnection.localDescription.sdp;
-                    sdpInput.value = sdp;
-                    
-                    log('Full SDP Code generated in the text area.', 'success');
-                    updateSignalingUI(); // Update UI to show QR/Copy button
-                    
-                    if (peerConnection.localDescription.type === 'offer') {
-                         updateStatus('Offer READY! Copy or Scan Code below.', 'success');
-                         log('ACTION: Copy this Offer Code or use the QR code!', 'success');
-                    } else if (peerConnection.localDescription.type === 'answer') {
-                         updateStatus('Answer READY! Copy or Scan Code below.', 'success');
-                         log('ACTION: Copy this Answer Code or use the QR code!', 'success');
-                    }
-                }, 100); // 100ms is usually sufficient for the browser to finalize the SDP string
-            }
-        };
+// ICE gather delay fix
+function waitICE() {
+  return new Promise(resolve => {
+    if(pc.iceGatheringState === "complete") return setTimeout(resolve,100);
+    function check() { if(pc.iceGatheringState==="complete") { pc.removeEventListener('icegatheringstatechange',check); setTimeout(resolve,100);} }
+    pc.addEventListener('icegatheringstatechange',check);
+  });
+}
 
-        peerConnection.onconnectionstatechange = () => {
-            log(`Connection state: ${peerConnection.connectionState}`, 'info');
-            switch(peerConnection.connectionState) {
-                case 'connected':
-                    updateStatus('Connection Established! P2P Ready.', 'success');
-                    break;
-                case 'failed':
-                case 'closed':
-                    updateStatus('Connection Failed or Closed.', 'error');
-                    break;
-                case 'connecting':
-                    updateStatus('Attempting connection...', 'progress');
-                    break;
-            }
-        };
-
-        peerConnection.ondatachannel = (event) => {
-            log('Received Data Channel from peer!', 'info');
-            dataChannel = event.channel;
-            setupDataChannelListeners(dataChannel);
-            createOfferBtn.disabled = true;
-            createAnswerBtn.disabled = true;
-        };
-    }
-
-    function setupDataChannelListeners(channel) {
-        channel.onopen = () => {
-            log('Data Channel is OPEN!', 'success');
-            if (fileToSend) {
-                sendFile();
-            } else {
-                document.getElementById('transfer-progress-container').style.display = 'block';
-                log('Ready to receive file chunks...', 'info');
-            }
-        };
-
-        channel.onmessage = (event) => {
-            if (typeof event.data === 'string') {
-                handleMetadata(event.data);
-            } else if (event.data instanceof ArrayBuffer) {
-                handleFileChunk(event.data);
-            }
-        };
-
-        channel.onclose = () => {
-            log('Data Channel closed.', 'info');
-            updateStatus('Disconnected.', 'error');
-        };
-        
-        channel.onerror = (error) => {
-            log(`Data Channel Error: ${error.message}`, 'error');
-        };
-
-        dataChannel = channel;
-    }
-
-
-    // --- SENDER LOGIC ---
-
-    async function createOffer() {
-        initializePeerConnection();
-        dataChannel = peerConnection.createDataChannel('file-transfer', { ordered: true });
-        setupDataChannelListeners(dataChannel);
-        try {
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            updateStatus('Offer created. Gathering ICE Candidates...', 'progress');
-            createOfferBtn.disabled = true;
-        } catch (error) {
-            log(`Error creating offer: ${error.message}`, 'error');
-        }
-    }
-    
-    function prepareFile(file) {
-        if (file.size > MAX_FILE_SIZE) {
-            log(`File size exceeds the ${MAX_FILE_SIZE / (1024*1024)}MB limit.`, 'error');
-            fileToSend = null;
-            document.getElementById('file-info').textContent = '';
-            createOfferBtn.disabled = true;
-            return;
-        }
-        fileToSend = file;
-        totalFileSize = file.size;
-        fileChunks = [];
-        let offset = 0;
-        while (offset < totalFileSize) {
-            const chunk = file.slice(offset, offset + CHUNK_SIZE);
-            fileChunks.push(chunk);
-            offset += CHUNK_SIZE;
-        }
-        document.getElementById('file-info').textContent = `File Ready: ${file.name} | Size: ${(totalFileSize / 1024 / 1024).toFixed(2)} MB | Chunks: ${fileChunks.length}`;
-        createOfferBtn.disabled = false;
-        log('File prepared and chunked. Ready to create Offer Code.', 'success');
-    }
-
-    function sendFile() {
-        if (!dataChannel || dataChannel.readyState !== 'open' || !fileToSend) {
-            log('Data channel not ready or no file selected.', 'error');
-            return;
-        }
-
-        progressContainer.style.display = 'block';
-        
-        const metadata = JSON.stringify({
-            name: fileToSend.name,
-            size: totalFileSize,
-            type: fileToSend.type
-        });
-        dataChannel.send(metadata);
-        log(`Sent file metadata: ${fileToSend.name}`, 'info');
-
-        let chunkIndex = 0;
-        let bytesSent = 0;
-
-        function sendNextChunk() {
-            if (chunkIndex < fileChunks.length) {
-                const chunk = fileChunks[chunkIndex];
-                
-                if (dataChannel.bufferedAmount > 65536) { 
-                    setTimeout(sendNextChunk, 100);
-                    return;
-                }
-
-                dataChannel.send(chunk);
-                bytesSent += chunk.size;
-                
-                const percent = ((bytesSent / totalFileSize) * 100);
-                progressBar.value = percent;
-                progressPercent.textContent = `${percent.toFixed(1)}%`;
-                updateStatus(`Sending: ${percent.toFixed(1)}%`, 'progress');
-
-                chunkIndex++;
-                requestAnimationFrame(sendNextChunk);
-            } else {
-                log('File transfer complete!', 'success');
-                updateStatus('Transfer Complete!', 'success');
-                fileToSend = null;
-            }
-        }
-        
-        sendNextChunk();
-    }
-
-
-    // --- RECEIVER LOGIC ---
-
-    async function createAnswer() {
-        if (!peerConnection || !peerConnection.remoteDescription) {
-            log('Cannot create Answer: No Offer code has been applied yet.', 'error');
-            return;
-        }
-        try {
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-            updateStatus('Answer created. Gathering ICE Candidates...', 'progress');
-            createAnswerBtn.disabled = true;
-        } catch (error) {
-            log(`Error creating answer: ${error.message}`, 'error');
-        }
-    }
-
-    function handleMetadata(data) {
-        try {
-            const metadata = JSON.parse(data);
-            totalFileSize = metadata.size;
-            receivedChunks = [];
-            bytesReceived = 0;
-            
-            log(`Receiving file: ${metadata.name} (${(metadata.size / 1024 / 1024).toFixed(2)} MB)`, 'success');
-            updateStatus('Receiving Data...', 'progress');
-            
-            progressContainer.style.display = 'block';
-            progressBar.value = 0;
-            progressPercent.textContent = '0%';
-            
-            document.getElementById('progress-percent').dataset.filename = metadata.name;
-        } catch (e) {
-             // Silent failure for non-metadata messages
-        }
-    }
-    
-    function handleFileChunk(chunk) {
-        receivedChunks.push(chunk);
-        bytesReceived += chunk.byteLength;
-
-        const percent = ((bytesReceived / totalFileSize) * 100);
-        progressBar.value = percent; 
-        progressPercent.textContent = `${percent.toFixed(1)}%`;
-        
-        if (bytesReceived >= totalFileSize) {
-            log('All chunks received! Rebuilding file...', 'info');
-            
-            const fileBlob = new Blob(receivedChunks, { type: dataChannel.binaryType });
-            const fileName = progressPercent.dataset.filename || 'downloaded_file';
-            
-            const url = URL.createObjectURL(fileBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            a.textContent = `Download: ${fileName}`;
-            a.style.cssText = 'color: var(--primary-color); text-decoration: none; font-weight: bold; font-size: 1.1em;';
-            
-            downloadArea.innerHTML = '';
-            downloadArea.appendChild(a);
-            
-            log('File successfully received and ready for download!', 'success');
-            updateStatus('Transfer Complete! Download Ready.', 'success');
-        }
-    }
-    // --- END SENDER/RECEIVER LOGIC ---
-
-    /** Sets the SDP (Offer or Answer) received from the other peer. */
-    async function setSdp() {
-        const sdpText = sdpInput.value.trim();
-        if (!sdpText) return;
-        
-        // Naive determination: if we have a local offer, the incoming SDP must be an answer. Otherwise, assume offer.
-        const type = peerConnection?.localDescription?.type === 'offer' ? 'answer' : 'offer';
-
-        if (!peerConnection) {
-            initializePeerConnection();
-        }
-        
-        const remoteDesc = new RTCSessionDescription({ type: type, sdp: sdpText });
-        
-        try {
-            // This line is now protected by the 100ms delay on the generating side.
-            await peerConnection.setRemoteDescription(remoteDesc); 
-            log(`Remote ${type} applied successfully.`, 'success');
-            sdpInput.value = '';
-            updateSignalingUI();
-            
-            if (type === 'offer') {
-                createAnswerBtn.disabled = false;
-                log('ACTION: Offer received. Click "Generate Answer" or scan its QR.', 'info');
-            } else {
-                log('Answer applied. Connection establishing...', 'info');
-                createAnswerBtn.disabled = true;
-            }
-        } catch (error) {
-            log(`FATAL ERROR: Failed to apply code. Reason: ${error.name}. Ensure you copied the FULL, FINAL code.`, 'error');
-            log(`Detailed Error: ${error.message}`, 'error');
-            updateStatus('Signaling Failed. Check log.', 'error');
-        }
-    }
-
-    // --- EVENT LISTENERS (UI) ---
-
-    // File Drop & Select Handlers
-    document.getElementById('drop-area').addEventListener('click', () => document.getElementById('file-input').click());
-    document.getElementById('file-input').addEventListener('change', (e) => prepareFile(e.target.files[0]));
-    
-    // Listen for text input to enable the Apply Code/Copy/QR button
-    sdpInput.addEventListener('input', updateSignalingUI);
-
-    // Signaling Button Handlers
-    createOfferBtn.addEventListener('click', createOffer);
-    createAnswerBtn.addEventListener('click', createAnswer);
-    setSdpBtn.addEventListener('click', setSdp);
-    
-    // NEW: Clipboard and Scanner Handlers
-    copyBtn.addEventListener('click', copyToClipboard);
-    scanQrBtn.addEventListener('click', startQrScanner);
-    
-    // Drag and drop listeners (for visual feedback)
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        }, false);
-    });
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropArea.addEventListener(eventName, () => dropArea.classList.add('highlight'), false);
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, () => dropArea.classList.remove('highlight'), false);
-    });
-
-    dropArea.addEventListener('drop', (e) => {
-        if (e.dataTransfer.files.length) {
-            prepareFile(e.dataTransfer.files[0]);
-        }
-    }, false);
-    
-    // Initial State
-    updateSignalingUI(); 
-    log('System Ready. Await user action.', 'info');
+// QR scanning (optional)
+async function scanQR() {
+  const video = document.getElementById('qrVideo');
+  video.style.display='block';
+  const stream = await navigator.mediaDevices.getUserMedia({video:true});
+  video.srcObject = stream;
+  const qrScanner = new QrScanner(video, result => {
+    offerText.value = result.data;
+    video.srcObject.getTracks().forEach(t=>t.stop());
+    video.style.display='none';
+  });
+  qrScanner.start();
+}
 </script>
-
+<script src="https://unpkg.com/qr-scanner/qr-scanner.min.js"></script>
 </body>
 </html>
